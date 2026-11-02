@@ -25,6 +25,6 @@
     "start": "node --experimental-strip-types \"./bin/safe-skill.ts\""
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.6.0"
   }
 }
