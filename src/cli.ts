@@ -786,3 +786,13 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   console.log(USAGE);
   return 1;
 }
+
+if (process.argv[1] && (process.argv[1].endsWith('cli.ts') || process.argv[1].endsWith('find_skill.ts') || process.argv[1].endsWith('safe-skill.ts'))) {
+  main().then((code) => {
+    if (typeof code === 'number' && code !== 0) process.exit(code);
+  }).catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}
+
