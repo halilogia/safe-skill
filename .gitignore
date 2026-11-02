@@ -8,3 +8,6 @@ Thumbs.db
 .claude/
 .cursor/
 reel/*.mp4
+reel/voice_*.mp3
+reel/test_*.mp3
+reel/*.wav
