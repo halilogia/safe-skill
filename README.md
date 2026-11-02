@@ -7,7 +7,8 @@ Zero-trust skill discovery, S0/S1 prompt injection defense, SHA-256 integrity se
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)]()
-[![Node](https://img.shields.io/badge/Node-%3E%3D20.0.0-informational.svg)]()
+[![Node](https://img.shields.io/badge/Node-%3E%3D22.6.0-informational.svg)]()
+[![MCP](https://img.shields.io/badge/MCP-JSON--RPC%202.0-blue.svg)]()
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Supported-orange.svg)]()
 [![Cursor](https://img.shields.io/badge/Cursor-Rules%20Ready-blueviolet.svg)]()
 [![Antigravity](https://img.shields.io/badge/Antigravity-Native-success.svg)]()
@@ -70,6 +71,15 @@ npx safe-skill
 # Search official Anthropic & community skills
 npx safe-skill search frontend
 
+# Semantic intent matching from natural language developer prompts
+npx safe-skill match "optimize database queries and create tables"
+
+# Threat intelligence bulletin & known CVE/malicious repo advisories
+npx safe-skill advisories
+
+# Start as an MCP Server (Model Context Protocol) via STDIO
+npx safe-skill mcp
+
 # Install with automatic target detection & S0/S1 security gate
 npx safe-skill install safe-git
 
@@ -102,6 +112,9 @@ npx safe-skill doctor
 | **Prior-Art Search** | ❌ None | ✅ **19 Registries via Patent CLI** |
 | **Interactive TUI** | ❌ None | ✅ **Zero-Dependency Terminal Menu** |
 | **Upstream Update Protection** | ❌ None | ✅ **Blocks updates if upstream turns malicious** |
+| **Built-in MCP Server** | ❌ None | ✅ **Native STDIO JSON-RPC 2.0 (8 MCP Tools)** |
+| **Semantic Intent Matcher** | ❌ None | ✅ **Maps natural language requests to skills** |
+| **Threat Advisories** | ❌ None | ✅ **Known malicious repo & exfiltration blocklist** |
 
 ---
 

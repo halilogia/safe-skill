@@ -32,6 +32,9 @@ import {
   askQuestion,
   type MenuItem
 } from './interactive_tui.ts';
+import { startMcpServer } from './mcp_server.ts';
+import { matchUserIntent } from './intent_matcher.ts';
+import { checkSecurityAdvisories, KNOWN_ADVISORIES } from './security_advisories.ts';
 
 export interface TechDetection {
   technology: string;
@@ -598,6 +601,17 @@ export async function cmdInstall(rest: string[]): Promise<number> {
   // Hedef ajana göre içeriği uyarla (örn. Cursor için .mdc formatı)
   const finalContent = adaptContentForTarget(rawContent, resolvedTarget.ecosystem, targetSkillName);
 
+  // Güvenlik bülteni ve bilinen tehdit istihbaratı denetimi
+  const advCheck = checkSecurityAdvisories(targetSkillName, finalContent);
+  if (advCheck.blocked && !force) {
+    console.error(`\n[SECURITY] GUVENLIK BULTENI ENGELI: "${targetSkillName}" bilinen bir tehdit deseniyle eslesti!`);
+    for (const a of advCheck.advisories) {
+      console.error(`  [KRITIK] [${a.id}] ${a.title} - ${a.description}`);
+    }
+    console.error(`Kurulum Guvenlik Kapisi tarafindan durduruldu.\n`);
+    return 1;
+  }
+
   // Güvenlik kapısı taraması (S0/S1)
   const scan = scanTextContent(finalContent, 'SKILL.md');
   if (!scan.ok && !force) {
@@ -720,21 +734,58 @@ export function startInteractiveCli(): Promise<void> {
   return runInteractiveMenu(items);
 }
 
-const USAGE = `🛡️ SAFE-SKILL: The Security-First Multi-Agent Skill Manager
+export async function cmdMatch(rest: string[]): Promise<number> {
+  const query = rest.join(' ').trim();
+  if (!query) {
+    console.error('Kullanim: safe-skill match "<ne yapmak istediginizi anlatin>"');
+    return 1;
+  }
+  console.log(`\n[INTENT] DOGAL DIL NIYET ANALIZI: "${query}"\n`);
+  const matches = matchUserIntent(query, 5);
+  if (matches.length === 0) {
+    console.log('Eslesen belirgin bir beceri bulunamadi. Lutfen farkli anahtar kelimelerle deneyin.');
+    return 0;
+  }
+
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    console.log(`  ${i + 1}. [SKILL] ${m.skill.name} (Skor: ${m.score}) [${m.skill.category}]`);
+    console.log(`     ${m.skill.descriptionTr || m.skill.descriptionEn}`);
+    console.log(`     Gerekce: ${m.recommendedReason}`);
+    console.log(`     -> Kur: safe-skill install ${m.skill.name}\n`);
+  }
+  return 0;
+}
+
+export async function cmdAdvisories(): Promise<number> {
+  console.log(`\n[SECURITY] GUNCEL GUVENLIK BULTENI VE TEHDIT ISTIHBARATI (${KNOWN_ADVISORIES.length} Kayit):\n`);
+  for (const adv of KNOWN_ADVISORIES) {
+    const tag = adv.severity === 'CRITICAL' ? '[KRITIK]' : '[UYARI]';
+    console.log(`  ${tag} [${adv.id}] ${adv.title} (${adv.severity})`);
+    console.log(`     Desen: "${adv.targetPattern}" | Tur: ${adv.type} | Tarih: ${adv.publishedAt}`);
+    console.log(`     Aciklama: ${adv.description}\n`);
+  }
+  return 0;
+}
+
+const USAGE = `SAFE-SKILL: The Security-First Multi-Agent Skill Manager
 For Claude Code, Cursor, Windsurf & Google Antigravity
 
 Kullanım:
-  safe-skill                                Etkileşimli TUI menüsü (veya analiz)
-  safe-skill <projeDizini>                  Belirtilen projeyi analiz et ve beceri öner
+  safe-skill                                Etkilesimli TUI menusu (veya analiz)
+  safe-skill <projeDizini>                  Belirtilen projeyi analiz et ve beceri oner
   safe-skill search <sorgu>                 Anthropic resmi & topluluk becerilerini ara
-  safe-skill scan [dizin|beceri]            S0/S1 Güvenlik & Prompt Injection taraması
-  safe-skill check [seçenekler]             Kurulu becerilerin güncellik durumunu denetle
-  safe-skill update <isim> [seçenekler]     Beceriyi güvenlik kapısıyla güncelle
-  safe-skill install <isim> [seçenekler]    Beceriyi doğrulanmış güvenlik kapısıyla yükle
-  safe-skill doctor [beceri]                Çalışma zamanı araç ve bağımlılıklarını denetle
-  safe-skill passport <beceri>              SHA-256 bütünlük pasaportunu doğrula
-  safe-skill menu | interactive             Etkileşimli terminal menüsünü aç
-  safe-skill --help | -h                    Bu yardım mesajını göster
+  safe-skill match <istek/prompt>           Dogal dil ile semantik beceri onerisi
+  safe-skill scan [dizin|beceri]            S0/S1 Guvenlik & Prompt Injection taramasi
+  safe-skill check [secenekler]             Kurulu becerilerin guncellik durumunu denetle
+  safe-skill update <isim> [secenekler]     Beceriyi guvenlik kapisiyla guncelle
+  safe-skill install <isim> [secenekler]    Beceriyi dogrulanmis guvenlik kapisiyla yukle
+  safe-skill advisories                     Guncel guvenlik tehdit bultenini listele
+  safe-skill mcp | --mcp                    STDIO Model Context Protocol sunucusunu baslat
+  safe-skill doctor [beceri]                Calisma zamani arac ve bagimliliklarini denetle
+  safe-skill passport <beceri>              SHA-256 butunluk pasaportunu dogrula
+  safe-skill menu | interactive             Etkilesimli terminal menusunu ac
+  safe-skill --help | -h                    Bu yardim mesajini goster
 
 Seçenekler:
   --target, -t <claude|antigravity|cursor>  Hedef ajan ekosistemi (varsayılan: otomatik tespit)
@@ -767,6 +818,12 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   }
 
   if (arg === 'search') return cmdSearch(rest);
+  if (arg === 'match' || arg === 'suggest') return cmdMatch(rest);
+  if (arg === 'advisories' || arg === 'advisory') return cmdAdvisories();
+  if (arg === 'mcp' || arg === '--mcp') {
+    startMcpServer();
+    return 0;
+  }
   if (arg === 'scan') return cmdScan(rest);
   if (arg === 'doctor') return cmdDoctor(rest);
   if (arg === 'passport') return cmdPassport(rest);
@@ -787,7 +844,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   return 1;
 }
 
-if (process.argv[1] && (process.argv[1].endsWith('cli.ts') || process.argv[1].endsWith('find_skill.ts') || process.argv[1].endsWith('safe-skill.ts'))) {
+if (process.argv[1] && (process.argv[1].endsWith('cli.ts') || process.argv[1].endsWith('find_skill.ts'))) {
   main().then((code) => {
     if (typeof code === 'number' && code !== 0) process.exit(code);
   }).catch((err) => {

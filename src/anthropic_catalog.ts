@@ -298,6 +298,10 @@ export function getAnthropicSkill(idOrName: string): AnthropicSkillMeta | undefi
   );
 }
 
+export function getAllAnthropicSkills(): AnthropicSkillMeta[] {
+  return ANTHROPIC_OFFICIAL_SKILLS;
+}
+
 export function generateBuiltinSkillContent(meta: AnthropicSkillMeta): string {
   return `---
 name: ${meta.id}

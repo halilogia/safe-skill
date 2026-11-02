@@ -16,6 +16,21 @@
   "author": "Halil Emre",
   "license": "MIT",
   "type": "module",
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "README.tr.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/halilogia/safe-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/halilogia/safe-skill/issues"
+  },
+  "homepage": "https://github.com/halilogia/safe-skill#readme",
   "bin": {
     "safe-skill": "./bin/safe-skill.ts",
     "safeskill": "./bin/safe-skill.ts"

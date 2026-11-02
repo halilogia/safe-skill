@@ -32,6 +32,9 @@ Topluluk depolarından (`skills.sh` vb.) indirilen beceriler, geliştirici makin
 4. **Bağımlılık Doktoru (`doctor`):** Beceri için gerekli olan `ffmpeg`, `yt-dlp`, `git`, `python`, `node` gibi araçların sistemde hazır olup olmadığını doğrular.
 5. **Akıllı Proje Tespiti:** Projenizdeki teknoloji yığınını (TypeScript, Python, Godot, Rust, Android, MCP) otomatik tarayarak uygun becerileri proaktif olarak tavsiye eder.
 6. **Güvenli Güncelleme:** Upstream depolardan gelen güncellemeleri önce güvenlik kapısından geçirir; zararlı kod eklenmişse güncellemeyi engeller.
+7. **Dahili MCP Sunucusu (`mcp`):** Safe-Skill'i doğrudan Claude Desktop, Cursor veya Antigravity içerisine bir MCP aracı olarak entegre eder (STDIO JSON-RPC 2.0).
+8. **Semantik Niyet Eşleştirici (`match`):** Geliştiricinin doğal dildeki talebini (örn: "PostgreSQL sorgularını optimize et") anlayıp en doğru beceriyi önerir.
+9. **Tehdit İstihbarat Bülteni (`advisories`):** Bilinen zararlı repoları, sahte skill yayıncılarını ve veri sızdırma uç noktalarını dinamik olarak engeller.
 
 ---
 
@@ -48,6 +51,15 @@ npx safe-skill
 
 # Anthropic resmi ve topluluk becerilerini ara
 npx safe-skill search frontend
+
+# Doğal dil ile semantik beceri önerisi al
+npx safe-skill match "veritabanı sorgularını optimize et ve şema kur"
+
+# Güncel güvenlik tehdit bültenini incele
+npx safe-skill advisories
+
+# Claude / Cursor için dahili MCP sunucu modunu başlat
+npx safe-skill mcp
 
 # Güvenlik kapısı doğrulamasıyla beceri kur
 npx safe-skill install safe-git
