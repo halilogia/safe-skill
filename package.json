@@ -1,0 +1,30 @@
+{
+  "name": "safe-skill",
+  "version": "1.0.0",
+  "description": "Security-First & Multi-Agent Skill Manager for Claude Code, Cursor, Windsurf & Google Antigravity with S0/S1 gate, prompt injection scanner, SHA-256 passport, and dependency doctor.",
+  "keywords": [
+    "claude-code",
+    "cursor",
+    "skills",
+    "agentic-ai",
+    "antigravity",
+    "prompt-injection",
+    "security-scanner",
+    "mcp",
+    "ai-agents"
+  ],
+  "author": "Halil Emre",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "safe-skill": "./bin/safe-skill.ts",
+    "safeskill": "./bin/safe-skill.ts"
+  },
+  "scripts": {
+    "test": "node --test --experimental-strip-types \"test/**/*.test.ts\"",
+    "start": "node --experimental-strip-types \"./bin/safe-skill.ts\""
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
