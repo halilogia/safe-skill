@@ -137,7 +137,7 @@ npx safe-skill doctor
 ## 🛠️ Development & Testing
 
 ```bash
-git clone https://github.com/halilemre/safe-skill.git
+git clone https://github.com/halilogia/safe-skill.git
 cd safe-skill
 npm test
 ```
