@@ -229,6 +229,16 @@ const DANGEROUS_CMD_PATTERNS: { pattern: RegExp; desc: string; severity: 'CRITIC
     pattern: /(?:>>?|\btee\s+(?:-a\s+)?|\bSet-Content\s+|\bAdd-Content\s+)[^\n]*(?:\.claude[\/\\]settings|CLAUDE\.md|AGENTS\.md|\.gemini[\/\\](?:settings|config))/i,
     desc: 'Bellek/Yapılandırma Zehirlenmesi: ajan ayar veya talimat dosyasına yazılıyor',
     severity: 'MEDIUM'
+  },
+  {
+    pattern: /(?:>>?|\btee\s+(?:-a\s+)?|\b(?:Set-Content|Add-Content|Out-File|writeFileSync)\b)[^\n]*(?:mcp_config\.json|\.cursor[\/\\]mcp\.json|claude_desktop_config\.json)/i,
+    desc: 'MCP Yapılandırma Zehirlenmesi: yetkisiz MCP sunucu yapılandırması yazılıyor',
+    severity: 'HIGH'
+  },
+  {
+    pattern: /(?:atob|Buffer\.from|b64decode|FromBase64String)\s*\(\s*["'][A-Za-z0-9+/=]{120,}["']/i,
+    desc: 'Gizlenmiş Yük (Obfuscated Payload): yüksek uzunluklu kodlanmış Base64 bloğu çözülüyor',
+    severity: 'HIGH'
   }
 ];
 

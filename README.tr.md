@@ -2,10 +2,19 @@
 
 # 🛡️ Safe-Skill (Türkçe Kılavuz)
 
-**Claude Code, Cursor, Windsurf ve Google Antigravity için Güvenlik Öncelikli Çoklu Ajan Beceri Yöneticisi.**<br>
-Sıfır güvenli keşif, S0/S1 prompt injection savunması, SHA-256 kriptografik pasaport mühürleme ve çapraz ekosistem kurulumu.
+**Güvenlik Öncelikli Çoklu Ajan Beceri Yöneticisi & Otonom İş Akışı Radarı**<br>
+İnternetteki bilinmeyen iş akışlarını keşfedin, S0/S1 güvenlik kapısından geçirin, SHA-256 pasaportuyla mühürleyin ve 6 farklı kodlama ajanına sıfır bağımlılıkla kurun.
 
-[**English Documentation**](README.md) · [**Türkçe**](README.tr.md)
+[![Tests](https://github.com/halilogia/safe-skill/actions/workflows/test.yml/badge.svg)](https://github.com/halilogia/safe-skill/actions/workflows/test.yml)
+[![Node](https://img.shields.io/badge/Node-%3E%3D22.6.0-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-0ea5e9)](package.json)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[**English**](README.md) · [**Türkçe**](README.tr.md)
+
+<br>
+
+<img src="screenshots/preview.png" alt="Safe-Skill Etkileşimli Terminal" width="820" />
 
 </div>
 
@@ -13,70 +22,36 @@ Sıfır güvenli keşif, S0/S1 prompt injection savunması, SHA-256 kriptografik
 
 ## ⚡ Neden Safe-Skill?
 
-Topluluk depolarından (`skills.sh` vb.) indirilen beceriler, geliştirici makinenizde doğrudan komut ve prompt talimatı çalıştırır. Standart beceri yöneticilerinde **hiçbir güvenlik doğrulaması bulunmaz**:
-* 🔴 Doğrulanmamış bir beceri **prompt injection** (`ignore previous instructions`, `dan mode`) içerebilir.
-* 🔴 Hassas anahtarları (`~/.ssh`, `~/.aws/credentials`) sızdırmaya çalışabilir.
-* 🔴 Zararlı sistem komutları (`rm -rf /`, `curl ... | sh`, `Format-Volume`) yürütebilir.
-* 🔴 Upstream repolarda sonradan yapılan zararlı güncellemeler (TOCTOU) fark edilmeden sisteme girebilir.
+1. **Keşif Körlüğünü Çözer:** Prosedürel 3D, piksel VFX, oyun sesi veya shader gibi harika iş akışları X gönderilerine, GitHub repolarına ve Hacker News paylaşımlarına dağılmış durumdadır. `discover` komutu 4 canlı kaynağı paralel tarayıp size hazır getirir.
+2. **Tedarik Zinciri Güvenliği Sağlar:** Standart araçlar internetteki markdown ve betikleri doğrudan diske kopyalar. Safe-Skill ise her şeyi önce geçici dizinde **S0/S1 Güvenlik Kapısı**'ndan geçirir, zararlı komutları engeller ve temiz dosyaları **SHA-256 `passport.json`** ile mühürler.
 
 ---
 
-## 🛡️ Safe-Skill Mimarisi
-
-1. **S0/S1 Güvenlik Kapısı (Security Gate):** Statik AST/Regex motoru ile prompt injection, jailbreak, komut sızdırma ve yıkıcı kabuk çağrılarını kurulumdan önce engeller.
-2. **Kriptografik Pasaport (`passport.json`):** Kurulan dosyaların SHA-256 hash özetini mühürler. Dosyalarda sonradan izinsiz bir değişiklik yapılırsa anında alarm verir.
-3. **Çapraz Ajan Desteği (Cross-Ecosystem):** İndirilen beceriyi seçilen platforma otomatik uyarlar:
-   * **Claude Code:** `.claude/skills/<beceri>/SKILL.md`
-   * **Cursor:** `.cursor/rules/<beceri>.mdc`
-   * **Antigravity:** `~/.gemini/config/skills/<beceri>/SKILL.md`
-4. **Bağımlılık Doktoru (`doctor`):** Beceri için gerekli olan `ffmpeg`, `yt-dlp`, `git`, `python`, `node` gibi araçların sistemde hazır olup olmadığını doğrular.
-5. **Akıllı Proje Tespiti:** Projenizdeki teknoloji yığınını (TypeScript, Python, Godot, Rust, Android, MCP) otomatik tarayarak uygun becerileri proaktif olarak tavsiye eder.
-6. **Güvenli Güncelleme:** Upstream depolardan gelen güncellemeleri önce güvenlik kapısından geçirir; zararlı kod eklenmişse güncellemeyi engeller.
-7. **Dahili MCP Sunucusu (`mcp`):** Safe-Skill'i doğrudan Claude Desktop, Cursor veya Antigravity içerisine bir MCP aracı olarak entegre eder (STDIO JSON-RPC 2.0).
-8. **Semantik Niyet Eşleştirici (`match`):** Geliştiricinin doğal dildeki talebini (örn: "PostgreSQL sorgularını optimize et") anlayıp en doğru beceriyi önerir.
-9. **Tehdit İstihbarat Bülteni (`advisories`):** Bilinen zararlı repoları, sahte skill yayıncılarını ve veri sızdırma uç noktalarını dinamik olarak engeller.
-
----
-
-## 🚀 Hızlı Başlangıç
-
-Kurulum gerektirmeden `npx` ile anında çalıştırın:
+## 🧭 Otonom İş Akışı Radarı (`discover`)
 
 ```bash
-# Etkileşimli TUI menüsünü aç
-npx safe-skill
+# Konu veya hazır alan ile internetteki iş akışlarını keşfet:
+npx safe-skill discover "pixel vfx"
+npx safe-skill discover --domain 3d
+# Alanlar: 3d | pixel-vfx | audio-sfx | shader | gamedev | video
 
-# Çalışılan projeyi analiz et ve uygun becerileri öner
-npx safe-skill
+# Kurmadan önce gerçek içeriği ve S0/S1 taramasını önizle:
+npx safe-skill install bgrenat/godot-game-dev-studio --dry-run
 
-# Anthropic resmi ve topluluk becerilerini ara
-npx safe-skill search frontend
-
-# Doğal dil ile semantik beceri önerisi al
-npx safe-skill match "veritabanı sorgularını optimize et ve şema kur"
-
-# Güncel güvenlik tehdit bültenini incele
-npx safe-skill advisories
-
-# Claude / Cursor için dahili MCP sunucu modunu başlat
-npx safe-skill mcp
-
-# Güvenlik kapısı doğrulamasıyla beceri kur
-npx safe-skill install safe-git
-
-# Belirli bir ajan platformu için kur
-npx safe-skill install frontend-design --target claude
-npx safe-skill install mcp-builder --target cursor
-
-# Kurulu becerilerin güncellik ve pasaport durumunu denetle
-npx safe-skill check
-
-# Güvenlik doğrulamalı güncelleme yap
-npx safe-skill update frontend-design
-
-# Sistem araç bağımlılıklarını test et
-npx safe-skill doctor
+# Topluluk becerisini, GitHub reposunu veya X gönderisini kur:
+npx safe-skill install vladmdgolam/agent-skills@blender-mcp --target antigravity
 ```
+
+---
+
+## 🎯 6 Ajan Ekosistemi Desteği
+
+- **Google Antigravity:** `.gemini/skills/<ad>/SKILL.md`
+- **Claude Code:** `.claude/skills/<ad>/SKILL.md`
+- **Cursor:** `.cursor/rules/<ad>.mdc`
+- **Windsurf:** `.windsurf/rules/<ad>.md`
+- **GitHub Copilot:** `.github/instructions/<ad>.instructions.md`
+- **OpenAI Codex:** `.codex/skills/<ad>/SKILL.md`
 
 ---
 

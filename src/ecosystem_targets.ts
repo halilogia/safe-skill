@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-export type AgentEcosystem = 'claude' | 'antigravity' | 'cursor';
+export type AgentEcosystem = 'claude' | 'antigravity' | 'cursor' | 'windsurf' | 'copilot' | 'codex';
 
 export interface TargetResolution {
   ecosystem: AgentEcosystem;
@@ -22,6 +22,18 @@ export function detectEcosystem(cwd: string = process.cwd()): AgentEcosystem {
   }
   if (fs.existsSync(path.join(cwd, '.cursor'))) {
     return 'cursor';
+  }
+  if (fs.existsSync(path.join(cwd, '.windsurf')) || fs.existsSync(path.join(cwd, '.windsurfrules'))) {
+    return 'windsurf';
+  }
+  if (
+    fs.existsSync(path.join(cwd, '.github', 'copilot-instructions.md')) ||
+    fs.existsSync(path.join(cwd, '.github', 'instructions'))
+  ) {
+    return 'copilot';
+  }
+  if (fs.existsSync(path.join(cwd, '.codex')) || fs.existsSync(path.join(cwd, 'AGENTS.md'))) {
+    return 'codex';
   }
   if (fs.existsSync(path.join(cwd, '.gemini')) || fs.existsSync(path.join(cwd, '.agent'))) {
     return 'antigravity';
@@ -86,6 +98,48 @@ export function resolveTargetInstallPath(options: {
     };
   }
 
+  if (ecosystem === 'windsurf') {
+    const rulesDir = scope === 'workspace'
+      ? path.join(cwd, '.windsurf', 'rules')
+      : path.join(home, '.codeium', 'windsurf', 'memories');
+    return {
+      ecosystem: 'windsurf',
+      scope,
+      skillsDir: rulesDir,
+      targetDir: rulesDir,
+      targetFile: path.join(rulesDir, `${skillName}.md`),
+      isCursorRule: false
+    };
+  }
+
+  if (ecosystem === 'copilot') {
+    const instrDir = scope === 'workspace'
+      ? path.join(cwd, '.github', 'instructions')
+      : path.join(home, '.copilot', 'instructions');
+    return {
+      ecosystem: 'copilot',
+      scope,
+      skillsDir: instrDir,
+      targetDir: instrDir,
+      targetFile: path.join(instrDir, `${skillName}.instructions.md`),
+      isCursorRule: false
+    };
+  }
+
+  if (ecosystem === 'codex') {
+    const skillsDir = scope === 'workspace'
+      ? path.join(cwd, '.codex', 'skills')
+      : path.join(home, '.codex', 'skills');
+    return {
+      ecosystem: 'codex',
+      scope,
+      skillsDir,
+      targetDir: path.join(skillsDir, skillName),
+      targetFile: path.join(skillsDir, skillName, 'SKILL.md'),
+      isCursorRule: false
+    };
+  }
+
   // Antigravity (Varsayılan)
   const skillsDir = scope === 'workspace'
     ? path.join(cwd, '.gemini', 'skills')
@@ -105,13 +159,15 @@ export function resolveTargetInstallPath(options: {
  * İndirilen markdown içeriğini hedef ajana (Cursor .mdc veya standart SKILL.md) uyarlar.
  */
 export function adaptContentForTarget(content: string, ecosystem: AgentEcosystem, skillName: string): string {
-  if (ecosystem !== 'cursor') {
+  if (ecosystem !== 'cursor' && ecosystem !== 'copilot') {
     return content;
   }
 
-  // Cursor .mdc formatı: description, globs, alwaysApply alanlarını içerir.
   const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!fmMatch) {
+    if (ecosystem === 'copilot') {
+      return `---\napplyTo: "**"\ndescription: ${skillName} skill instructions\n---\n\n${content}`;
+    }
     return `---\ndescription: ${skillName} skill instructions\nglobs: "*"\nalwaysApply: false\n---\n\n${content}`;
   }
 
@@ -124,13 +180,9 @@ export function adaptContentForTarget(content: string, ecosystem: AgentEcosystem
     desc = descMatch[1].trim();
   }
 
-  const newFm = [
-    '---',
-    `description: ${desc}`,
-    'globs: "*"',
-    'alwaysApply: false',
-    '---'
-  ].join('\n');
+  const newFm = ecosystem === 'copilot'
+    ? ['---', 'applyTo: "**"', `description: ${desc}`, '---'].join('\n')
+    : ['---', `description: ${desc}`, 'globs: "*"', 'alwaysApply: false', '---'].join('\n');
 
   return `${newFm}\n\n${body}`;
 }

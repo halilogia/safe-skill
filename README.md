@@ -2,152 +2,130 @@
 
 # 🛡️ Safe-Skill
 
-**The Security-First Multi-Agent Skill Manager for Claude Code, Cursor, Windsurf & Google Antigravity.**<br>
-Zero-trust skill discovery, S0/S1 prompt injection defense, SHA-256 integrity sealing, and cross-ecosystem installation.
+**Security-First Multi-Agent Skill Manager & Autonomous Workflow Radar**<br>
+Discover unknown AI workflows across the open web, scan every byte through an S0/S1 security gate, seal with SHA-256 passports, and route to 6 coding-agent ecosystems — with **zero runtime dependencies**.
 
+[![Tests](https://github.com/halilogia/safe-skill/actions/workflows/test.yml/badge.svg)](https://github.com/halilogia/safe-skill/actions/workflows/test.yml)
+[![Node](https://img.shields.io/badge/Node-%3E%3D22.6.0-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-0ea5e9)](package.json)
+[![MCP Server](https://img.shields.io/badge/MCP-9%20Tools%20(STDIO)-8b5cf6)](src/mcp_server.ts)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)]()
-[![Node](https://img.shields.io/badge/Node-%3E%3D22.6.0-informational.svg)]()
-[![MCP](https://img.shields.io/badge/MCP-JSON--RPC%202.0-blue.svg)]()
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-Supported-orange.svg)]()
-[![Cursor](https://img.shields.io/badge/Cursor-Rules%20Ready-blueviolet.svg)]()
-[![Antigravity](https://img.shields.io/badge/Antigravity-Native-success.svg)]()
 
-[**English**](README.md) · [**Türkçe Dokümantasyon**](README.tr.md)
+[**Overview**](#-why-safe-skill) · [**Workflow Radar**](#-autonomous-workflow-radar-discover) · [**Architecture**](#%EF%B8%8F-architecture--security-gate) · [**Quick Start**](#-quick-start) · [**Ecosystems**](#-6-agent-ecosystem-routing) · [**MCP Server**](#-mcp-server-integration) · [**Türkçe**](README.tr.md)
+
+<br>
+
+<img src="screenshots/preview.png" alt="Safe-Skill Interactive Terminal" width="820" />
 
 </div>
 
 ---
 
-## ⚡ The Problem
+## ⚡ Why Safe-Skill?
 
-Community skills repositories (like `skills.sh` or standard CLI tools) download and execute arbitrary prompt instructions and scripts directly on your local developer machine. **Most managers offer zero security scanning**:
-* 🔴 An unverified skill can contain **prompt injections** (`ignore previous instructions`, `dan mode`).
-* 🔴 A skill can attempt to **exfiltrate API keys** (`~/.ssh`, `~/.aws/credentials`).
-* 🔴 A skill can execute **destructive system calls** (`rm -rf /`, `curl ... | sh`, `Format-Volume`).
-* 🔴 Upstream repositories can be **tampered with or silently updated** (TOCTOU attacks).
+Modern AI coding agents (`Claude Code`, `Cursor`, `Windsurf`, `Copilot`, `Codex`, `Antigravity`) rely on external `SKILL.md` playbooks and MCP workflows. Two critical gaps exist today:
+
+| 1. Discovery Blindness | 2. Supply-Chain Risk |
+| :--- | :--- |
+| Breakthrough workflows (procedural 3D, pixel VFX, game audio, shaders) are scattered across X threads, unindexed GitHub `SKILL.md` commits, and `Show HN` posts. | Standard managers copy remote markdown and scripts straight to disk with **zero inspection** — exposing machines to prompt injections, `curl \| sh` backdoors, and silent TOCTOU tampering. |
+
+**Safe-Skill solves both in one deterministic, zero-dependency CLI & MCP server.**
 
 ---
 
-## 🛡️ The Solution: Safe-Skill Architecture
+## 🧭 Autonomous Workflow Radar (`discover`)
+
+Instead of manually browsing X or scanning thousands of GitHub repos, `discover` fans out across **4 live high-signal sources** in parallel, deduplicates spam forks, and ranks results by agent-readiness:
+
+- **`skills.sh` Registry** — packaged agent skills (`owner/repo@skill`)
+- **GitHub `SKILL.md` Code Index** — newly published skills not yet in registries
+- **GitHub High-Signal Repos** — procedural pipelines, CLI tools, and MCP servers
+- **Hacker News `Show HN`** — builder-shared AI & creative workflows
+
+| Domain Preset | Command | Discovers |
+| :--- | :--- | :--- |
+| **`3d`** | `npx safe-skill discover --domain 3d` | Procedural 3D, Blender MCP, foliage, glTF/GLB generators |
+| **`pixel-vfx`** | `npx safe-skill discover --domain pixel-vfx` | `pixelfx`, sprite sheet generators, procedural pixel art |
+| **`audio-sfx`** | `npx safe-skill discover --domain audio-sfx` | `sfxr`, procedural game audio, ElevenLabs SFX skills |
+| **`shader`** | `npx safe-skill discover --domain shader` | Godot shaders, GLSL VFX, SDF & procedural shaders |
+| **`gamedev`** | `npx safe-skill discover --domain gamedev` | Godot MCP, game asset pipelines, engine tooling |
+| **`video`** | `npx safe-skill discover --domain video` | FFmpeg pipelines, Remotion, AI video workflows |
+
+---
+
+## 🛡️ Architecture & Security Gate
 
 ```mermaid
-flowchart TD
-    User([Developer / Agent]) -->|npx safe-skill install / check| CLI[Safe-Skill Engine]
-    CLI --> ProjectDetect[Project Tech Stack Detector]
-    ProjectDetect -->|Node, Python, Godot, Rust, MCP| Matcher[Curated Skill Matching]
-    
-    CLI --> Gate{S0/S1 Security Gate}
-    Gate -->|Static AST / Regex Scan| PromptInject[Prompt Injection & Jailbreak Check]
-    Gate -->|Payload Analysis| Destructive[Destructive Command Check]
-    Gate -->|Credential Patterns| Exfil[Credential Exfiltration Check]
-    
-    PromptInject -->|Flagged / Critical| Block[🛑 BLOCK & ROLLBACK]
-    Destructive -->|Dangerous| Block
-    Exfil -->|High Risk| Block
-    
-    PromptInject -->|CLEAN| Seal[🛂 Seal SHA-256 Passport]
-    Seal --> Doctor[🩺 Dependency Doctor Check]
-    Doctor --> EcosystemTarget[🎯 Ecosystem Target Router]
-    
-    EcosystemTarget -->|Claude Code| ClaudeDir[./.claude/skills/ or ~/.claude/skills/]
-    EcosystemTarget -->|Cursor| CursorDir[./.cursor/rules/*.mdc]
-    EcosystemTarget -->|Google Antigravity| AgyDir[~/.gemini/config/skills/]
+flowchart LR
+    Src["4 Live Sources<br/>(skills.sh · GitHub · HN · X)"] --> Discover["discover / search"]
+    Discover --> Stage["Staged Temp Dir<br/>(Never writes to target first)"]
+    Stage --> Gate{"S0/S1 Security Gate"}
+    Gate -->|"Injection / Exfil / Base64 / Destructive"| Block["🛑 BLOCK & ROLLBACK"]
+    Gate -->|"CLEAN"| Seal["🛂 Seal SHA-256 passport.json"]
+    Seal --> Route["🎯 6-Agent Ecosystem Adapter"]
 ```
+
+- **S0 Content Defense:** Detects prompt injections, jailbreaks, hidden HTML comments, zero-width/bidi Unicode (`Trojan Source`), and Latin/Cyrillic homoglyphs.
+- **S1 Action Defense:** Blocks `curl | sh`, PowerShell `IEX`, reverse shells, credential exfiltration (`~/.ssh`, `~/.aws`), Base64 obfuscated payloads, and MCP config poisoning (`mcp_config.json`).
+- **Real Community Install:** `install owner/repo@skill` or `install <github-or-x-url>` fetches the authentic `SKILL.md` (or synthesizes one from `README.md` / X post) and stages it through the gate before touching your workspace.
 
 ---
 
 ## 🚀 Quick Start
 
-Run instantly without global installation via `npx`:
+Requires **Node.js `>= 22.6.0`** (uses native `--experimental-strip-types` — no build step, no `node_modules`).
 
 ```bash
-# Launch interactive TUI menu
-npx safe-skill
+# Discover unknown workflows by topic or domain preset
+npx safe-skill discover "pixel vfx"
+npx safe-skill discover --domain 3d
 
-# Analyze current project tech stack and get tailored skill recommendations
-npx safe-skill
+# Preview & security-scan a remote skill or GitHub repo before installing
+npx safe-skill install bgrenat/godot-game-dev-studio --dry-run
 
-# Search official Anthropic & community skills
-npx safe-skill search frontend
-
-# Semantic intent matching from natural language developer prompts
-npx safe-skill match "optimize database queries and create tables"
-
-# Threat intelligence bulletin & known CVE/malicious repo advisories
-npx safe-skill advisories
-
-# Start as an MCP Server (Model Context Protocol) via STDIO
-npx safe-skill mcp
-
-# Install with automatic target detection & S0/S1 security gate
-npx safe-skill install safe-git
-
-# Install specifically for Claude Code or Cursor
+# Install official Anthropic, community (owner/repo@skill), or X/GitHub workflows
 npx safe-skill install frontend-design --target claude
-npx safe-skill install mcp-builder --target cursor
+npx safe-skill install vladmdgolam/agent-skills@blender-mcp --target antigravity
 
-# Check update status & integrity of all installed skills
-npx safe-skill check
-
-# Update a skill with upstream security gate verification
-npx safe-skill update frontend-design
-
-# Verify system binaries & tool dependencies
-npx safe-skill doctor
-```
-
----
-
-## ⚔️ Comparison: Safe-Skill vs. Standard Tools
-
-| Feature | Standard `find-skills` (`skills.sh`) | **Safe-Skill** 🛡️ |
-| :--- | :--- | :--- |
-| **S0/S1 Security Gate** | ❌ None (Text disclaimer only) | ✅ **Automated Static AST / Regex Engine** |
-| **Prompt Injection Defense** | ❌ None | ✅ **Detects Jailbreaks & System Overrides** |
-| **Cryptographic Integrity** | ❌ None | ✅ **SHA-256 `passport.json` Sealing** |
-| **Tamper Detection (TOCTOU)** | ❌ None | ✅ **Alerts if local files are altered** |
-| **Target Ecosystems** | `.claude` only | ✅ **Claude Code, Cursor (.mdc), Antigravity** |
-| **Project Stack Auto-Detection** | ❌ None | ✅ **Node, Python, Godot, Rust, Android, MCP** |
-| **Prior-Art Search** | ❌ None | ✅ **19 Registries via Patent CLI** |
-| **Interactive TUI** | ❌ None | ✅ **Zero-Dependency Terminal Menu** |
-| **Upstream Update Protection** | ❌ None | ✅ **Blocks updates if upstream turns malicious** |
-| **Built-in MCP Server** | ❌ None | ✅ **Native STDIO JSON-RPC 2.0 (8 MCP Tools)** |
-| **Semantic Intent Matcher** | ❌ None | ✅ **Maps natural language requests to skills** |
-| **Threat Advisories** | ❌ None | ✅ **Known malicious repo & exfiltration blocklist** |
-
----
-
-## 📦 Key Commands
-
-### 1. `scan [target]` — Security & Prompt Injection Audit
-Audits any local skill folder or repository before running it:
-```bash
+# Scan any local skill directory & verify SHA-256 integrity
 npx safe-skill scan ./path/to/skill
-```
-
-### 2. `check` & `update` — Safe Upstream Synchronization
-Checks whether upstream repositories have released updates and verifies that the new version is clean:
-```bash
-# Check all installed skills
 npx safe-skill check
-
-# Check specifically for Claude Code skills
-npx safe-skill check --target claude
-
-# Apply update with security gate
-npx safe-skill update frontend-design
-```
-
-### 3. `doctor` — Tool & Runtime Dependency Check
-Verifies that all binaries required by installed skills (`python`, `node`, `git`, `gh`, `patent`, `ffmpeg`, `yt-dlp`, `deno`) are installed with correct versions:
-```bash
 npx safe-skill doctor
 ```
 
 ---
 
-## 🛠️ Development & Testing
+## 🎯 6-Agent Ecosystem Routing
+
+| Ecosystem | Flag | Workspace Target | Format |
+| :--- | :--- | :--- | :--- |
+| **Google Antigravity** | `--target antigravity` | `.gemini/skills/<name>/SKILL.md` | `SKILL.md` |
+| **Claude Code** | `--target claude` | `.claude/skills/<name>/SKILL.md` | `SKILL.md` |
+| **Cursor** | `--target cursor` | `.cursor/rules/<name>.mdc` | `.mdc` frontmatter |
+| **Windsurf** | `--target windsurf` | `.windsurf/rules/<name>.md` | Markdown rule |
+| **GitHub Copilot** | `--target copilot` | `.github/instructions/<name>.instructions.md` | `applyTo: "**"` |
+| **OpenAI Codex** | `--target codex` | `.codex/skills/<name>/SKILL.md` | `SKILL.md` |
+
+---
+
+## 🔌 MCP Server Integration
+
+Expose Safe-Skill's **9 native tools** (`discover_workflows`, `scan_skill`, `install_safe_skill`, `search_skills`, `match_intent`, `verify_passport`, `diagnose_dependencies`, `check_updates`, `check_advisories`) over STDIO JSON-RPC 2.0:
+
+```json
+{
+  "mcpServers": {
+    "safe-skill": {
+      "command": "npx",
+      "args": ["-y", "safe-skill", "mcp"]
+    }
+  }
+}
+```
+
+---
+
+## 🛠️ Development & Docs
 
 ```bash
 git clone https://github.com/halilogia/safe-skill.git
@@ -155,5 +133,4 @@ cd safe-skill
 npm test
 ```
 
-## 📄 License
-MIT © 2026 Halil Emre
+[Architecture](ARCHITECTURE.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Knowledge](KNOWLEDGE.md) · [Tasks](TASKS.md) · [Agents](AGENTS.md) · [Design](DESIGN.md) · [MIT License](LICENSE)

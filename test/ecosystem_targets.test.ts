@@ -31,6 +31,33 @@ test('ecosystem_targets - path resolution', () => {
   });
   assert.equal(agyRes.ecosystem, 'antigravity');
   assert.match(agyRes.targetFile, /\.gemini[\\\/]skills[\\\/]safe-git[\\\/]SKILL\.md$/);
+
+  const windsurfRes = resolveTargetInstallPath({
+    ecosystem: 'windsurf',
+    skillName: 'safe-git',
+    scope: 'workspace',
+    cwd: 'C:/mock/project'
+  });
+  assert.equal(windsurfRes.ecosystem, 'windsurf');
+  assert.match(windsurfRes.targetFile, /\.windsurf[\\\/]rules[\\\/]safe-git\.md$/);
+
+  const copilotRes = resolveTargetInstallPath({
+    ecosystem: 'copilot',
+    skillName: 'safe-git',
+    scope: 'workspace',
+    cwd: 'C:/mock/project'
+  });
+  assert.equal(copilotRes.ecosystem, 'copilot');
+  assert.match(copilotRes.targetFile, /\.github[\\\/]instructions[\\\/]safe-git\.instructions\.md$/);
+
+  const codexRes = resolveTargetInstallPath({
+    ecosystem: 'codex',
+    skillName: 'safe-git',
+    scope: 'workspace',
+    cwd: 'C:/mock/project'
+  });
+  assert.equal(codexRes.ecosystem, 'codex');
+  assert.match(codexRes.targetFile, /\.codex[\\\/]skills[\\\/]safe-git[\\\/]SKILL\.md$/);
 });
 
 test('ecosystem_targets - adaptContentForTarget for cursor .mdc', () => {

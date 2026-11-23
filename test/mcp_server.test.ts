@@ -13,6 +13,7 @@ test('mcp_server - tool declarations are valid', () => {
   assert.ok(toolNames.includes('diagnose_dependencies'));
   assert.ok(toolNames.includes('check_updates'));
   assert.ok(toolNames.includes('check_advisories'));
+  assert.ok(toolNames.includes('discover_workflows'));
 });
 
 test('mcp_server - search_skills returns matches', async () => {

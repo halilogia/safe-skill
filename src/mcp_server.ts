@@ -9,6 +9,7 @@ import { runSkillDoctor } from './dependency_doctor.ts';
 import { checkAllSkillsUpdates, checkSingleSkillUpdate } from './update_checker.ts';
 import { matchUserIntent } from './intent_matcher.ts';
 import { checkSecurityAdvisories } from './security_advisories.ts';
+import { discoverWorkflows, stageAndInstallSkill } from './workflow_discovery.ts';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -122,6 +123,18 @@ export const MCP_TOOLS = [
       },
       required: ['skillIdentifier']
     }
+  },
+  {
+    name: 'discover_workflows',
+    description: 'skills.sh, GitHub SKILL.md indeksi, GitHub repolari ve Hacker News uzerinden bilinmeyen is akislarini ve ajan araclarini kesfeder.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Aranacak konu (orn: "3d foliage", "pixel vfx", "sound effects")' },
+        domain: { type: 'string', enum: ['pixel-vfx', '3d', 'audio-sfx', 'shader', 'gamedev', 'video'] },
+        limit: { type: 'number', description: 'Maksimum sonuc sayisi (varsayilan: 12)' }
+      }
+    }
   }
 ];
 
@@ -182,9 +195,31 @@ export async function handleToolCall(name: string, args: any): Promise<{ content
         const found = getAnthropicSkill(args.skillName);
 
         if (!found) {
+          const remoteRes = await stageAndInstallSkill(args.skillName, {
+            target,
+            scope: args.global ? 'global' : 'workspace'
+          });
+          if (remoteRes.blocked) {
+            return {
+              content: [{
+                type: 'text',
+                text: `[SECURITY BLOCK] Beceri '${remoteRes.skillName}' guvenlik kapisindan gecemedi.\n` + JSON.stringify(remoteRes.scanResult.findings, null, 2)
+              }],
+              isError: true
+            };
+          }
           return {
-            content: [{ type: 'text', text: `[ERROR] Beceri '${args.skillName}' Anthropic resmi katalogunda bulunamadi.` }],
-            isError: true
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                status: 'SUCCESS',
+                message: `Beceri '${remoteRes.skillName}' basariyla kuruldu ve pasaportu muhurlendi.`,
+                skill: remoteRes.skillName,
+                target,
+                installPath: remoteRes.installedPath,
+                sha256: remoteRes.passportSha256
+              }, null, 2)
+            }]
           };
         }
 
@@ -307,6 +342,19 @@ export async function handleToolCall(name: string, args: any): Promise<{ content
             text: JSON.stringify(res, null, 2)
           }],
           isError: !res.safe
+        };
+      }
+
+      case 'discover_workflows': {
+        const res = await discoverWorkflows(args.query || '', {
+          domain: args.domain,
+          limit: typeof args.limit === 'number' ? args.limit : 12
+        });
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(res, null, 2)
+          }]
         };
       }
 

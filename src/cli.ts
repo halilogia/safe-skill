@@ -35,6 +35,8 @@ import {
 import { startMcpServer } from './mcp_server.ts';
 import { matchUserIntent } from './intent_matcher.ts';
 import { checkSecurityAdvisories, KNOWN_ADVISORIES } from './security_advisories.ts';
+import { discoverWorkflows, stageAndInstallSkill, WORKFLOW_DOMAINS } from './workflow_discovery.ts';
+import { searchHuggingFace } from './huggingface_search.ts';
 
 export interface TechDetection {
   technology: string;
@@ -323,11 +325,20 @@ function resolveSkillDir(targetArg?: string): string {
 }
 
 export async function cmdScan(rest: string[]): Promise<number> {
-  const target = resolveSkillDir(rest[0]);
+  const isJson = rest.includes('--json');
+  const targetArg = rest.find((a) => !a.startsWith('-'));
+  const target = resolveSkillDir(targetArg);
+
+  const result = scanSkillDirectory(target);
+
+  if (isJson) {
+    console.log(JSON.stringify({ target, ...result }, null, 2));
+    return result.verdict === 'DANGEROUS' ? 1 : 0;
+  }
+
   console.log(`\n🛡️ GÜVENLİK VE PROMPT INJECTION TARAMASI (S0/S1 Gate)`);
   console.log(`📂 Hedef: ${target}\n`);
 
-  const result = scanSkillDirectory(target);
   if (result.findings.length === 0) {
     console.log(`✔ ${result.summary}\n`);
     return 0;
@@ -346,10 +357,17 @@ export async function cmdScan(rest: string[]): Promise<number> {
 }
 
 export async function cmdDoctor(rest: string[]): Promise<number> {
-  const target = rest[0] ? resolveSkillDir(rest[0]) : undefined;
-  console.log(`\n🩺 ÇALIŞMA ZAMANI VE BAĞIMLILIK DOKTORU (Dependency Doctor)\n`);
-
+  const isJson = rest.includes('--json');
+  const targetArg = rest.find((a) => !a.startsWith('-'));
+  const target = targetArg ? resolveSkillDir(targetArg) : undefined;
   const report = runSkillDoctor(target);
+
+  if (isJson) {
+    console.log(JSON.stringify(report, null, 2));
+    return report.status === 'READY' ? 0 : 1;
+  }
+
+  console.log(`\n🩺 ÇALIŞMA ZAMANI VE BAĞIMLILIK DOKTORU (Dependency Doctor)\n`);
   console.log(`📦 İncelenen: ${report.skillName}`);
   console.log(`📊 Durum: ${report.status === 'READY' ? '🟢 READY' : '🟡 ' + report.status}`);
   console.log(`\nAraç Denetimleri:`);
@@ -434,6 +452,7 @@ export async function cmdSearch(rest: string[]): Promise<number> {
 export async function cmdCheck(rest: string[]): Promise<number> {
   let targetEco: AgentEcosystem | 'auto' = 'auto';
   let scope: 'global' | 'workspace' = 'global';
+  const isJson = rest.includes('--json');
 
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
@@ -452,10 +471,16 @@ export async function cmdCheck(rest: string[]): Promise<number> {
     scope
   });
 
+  const reports = await checkAllSkillsUpdates(resolvedTarget.skillsDir);
+
+  if (isJson) {
+    console.log(JSON.stringify({ ecosystem: resolvedTarget.ecosystem, skillsDir: resolvedTarget.skillsDir, reports }, null, 2));
+    return reports.some((r) => r.status === 'TAMPERED') ? 1 : 0;
+  }
+
   console.log(`\n🔄 GÜNCELLEME DENETİMİ (Update Check)`);
   console.log(`📂 Taranan Dizin: ${resolvedTarget.skillsDir} (Hedef Ajan: ${resolvedTarget.ecosystem.toUpperCase()})\n`);
 
-  const reports = await checkAllSkillsUpdates(resolvedTarget.skillsDir);
   if (reports.length === 0) {
     console.log(`  Bu dizinde kurulu beceri veya pasaport bulunamadı.\n`);
     return 0;
@@ -535,10 +560,12 @@ export async function cmdUpdate(rest: string[]): Promise<number> {
 
 export async function cmdInstall(rest: string[]): Promise<number> {
   let name = '';
+  let customName: string | undefined;
   let targetEco: AgentEcosystem | 'auto' = 'auto';
   let scope: 'global' | 'workspace' | null = null;
   let customPath: string | null = null;
   let force = false;
+  let dryRun = false;
 
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
@@ -548,6 +575,10 @@ export async function cmdInstall(rest: string[]): Promise<number> {
       targetEco = rest[++i] as any;
     } else if (a === '--force' || a === '-f') {
       force = true;
+    } else if (a === '--dry-run') {
+      dryRun = true;
+    } else if (a === '--name' || a === '-n') {
+      customName = rest[++i];
     } else if (a === '--path') {
       customPath = rest[++i] ?? null;
     } else if (!name && !a.startsWith('-')) {
@@ -561,8 +592,50 @@ export async function cmdInstall(rest: string[]): Promise<number> {
   }
 
   const anthropicMeta = getAnthropicSkill(name);
-  const targetSkillName = anthropicMeta ? anthropicMeta.id : name;
+  if (!anthropicMeta) {
+    // Topluluk (owner/repo@skill), GitHub repo, X URL veya yerel dosya kurulumu
+    try {
+      const res = await stageAndInstallSkill(name, {
+        name: customName,
+        target: targetEco,
+        scope: scope ?? 'global',
+        customPath,
+        force,
+        dryRun
+      });
 
+      if (res.blocked) {
+        console.error(`\n🛑 GÜVENLİK KAPISI ENGELİ: "${res.skillName}" içeriğinde güvenlik riski tespit edildi (${res.scanResult.verdict})!`);
+        for (const f of res.scanResult.findings) {
+          console.error(`  🔴 [${f.severity}] ${f.category} - ${f.description}`);
+        }
+        for (const a of res.advisoryResult.advisories) {
+          console.error(`  🔴 [${a.id}] ${a.title} - ${a.description}`);
+        }
+        console.error(`\nKurulum güvenlik nedeniyle durduruldu.\n`);
+        return 1;
+      }
+
+      if (dryRun) {
+        console.log(`\n🧪 DRY-RUN ÖNİZLEME: ${res.skillName}`);
+        console.log(`🔗 Kaynak: ${res.sourceUrl} (${res.synthesized ? 'Otomatik SKILL.md Sentezi' : 'Doğrudan SKILL.md'})`);
+        console.log(`🛡️ S0/S1 Güvenlik Kapısı: ${res.scanResult.verdict}\n`);
+        console.log(res.previewContent?.slice(0, 1200) || '');
+        return 0;
+      }
+
+      console.log(`\n⬇️ BECERİ KURULUMU: ${res.skillName}`);
+      console.log(`🔗 Kaynak: ${res.sourceUrl} (${res.synthesized ? 'README/Post -> SKILL.md Sentezi' : 'Gerçek SKILL.md'})`);
+      console.log(`✔ Kuruldu: ${res.installedPath}`);
+      console.log(`🛂 SHA-256 Pasaport Mühürlendi (${res.passportSha256?.slice(0, 16)}...)\n`);
+      return 0;
+    } catch (err) {
+      console.error(`Hata (install): ${(err as Error).message}`);
+      return 1;
+    }
+  }
+
+  const targetSkillName = anthropicMeta.id;
   if (!INSTALL_NAME_RE.test(targetSkillName)) {
     console.error('Hata: Geçersiz beceri adı formatı. Yalnızca harf, rakam, _ . - kullanılabilir.');
     return 2;
@@ -585,23 +658,14 @@ export async function cmdInstall(rest: string[]): Promise<number> {
     return 1;
   }
 
-  // İçeriği al (Anthropic resmi veya şablon)
-  let rawContent: string | null = null;
-  if (anthropicMeta) {
-    rawContent = downloadAnthropicSkillMd(anthropicMeta);
-  } else {
-    rawContent = `---\nname: ${targetSkillName}\ndescription: Community skill ${targetSkillName}\n---\n\n# ${targetSkillName}\n\nSkill implementation.`;
-  }
-
+  const rawContent = downloadAnthropicSkillMd(anthropicMeta);
   if (!rawContent) {
     console.error(`Hata: ${targetSkillName} içeriği alınamadı.`);
     return 1;
   }
 
-  // Hedef ajana göre içeriği uyarla (örn. Cursor için .mdc formatı)
   const finalContent = adaptContentForTarget(rawContent, resolvedTarget.ecosystem, targetSkillName);
 
-  // Güvenlik bülteni ve bilinen tehdit istihbaratı denetimi
   const advCheck = checkSecurityAdvisories(targetSkillName, finalContent);
   if (advCheck.blocked && !force) {
     console.error(`\n[SECURITY] GUVENLIK BULTENI ENGELI: "${targetSkillName}" bilinen bir tehdit deseniyle eslesti!`);
@@ -612,11 +676,11 @@ export async function cmdInstall(rest: string[]): Promise<number> {
     return 1;
   }
 
-  // Güvenlik kapısı taraması (S0/S1)
+  // scanTextContent yerine stage + scanSkillDirectory değilse bile mevcut sözleşmeyi koru
   const scan = scanTextContent(finalContent, 'SKILL.md');
-  if (!scan.ok && !force) {
+  if (scan.some((f) => f.severity === 'CRITICAL' || f.severity === 'HIGH') && !force) {
     console.error(`\n🛑 GÜVENLİK KAPISI ENGELİ: "${targetSkillName}" içeriğinde güvenlik riski tespit edildi!`);
-    for (const f of scan.findings) {
+    for (const f of scan) {
       console.error(`  🔴 [${f.severity}] ${f.category} - ${f.description}`);
       console.error(`     └─ Eşleşme: "${f.match.slice(0, 80)}"`);
     }
@@ -627,17 +691,15 @@ export async function cmdInstall(rest: string[]): Promise<number> {
   fs.mkdirSync(resolvedTarget.targetDir, { recursive: true });
   fs.writeFileSync(resolvedTarget.targetFile, finalContent, 'utf8');
 
-  // Pasaport mühürleme
   const passport = generateSkillPassport(resolvedTarget.targetDir, {
     name: targetSkillName,
-    sourceUrl: anthropicMeta?.githubUrl
+    sourceUrl: anthropicMeta.githubUrl
   });
   saveSkillPassport(resolvedTarget.targetDir, passport);
 
   console.log(`✔ Kurulum tamamlandı: ${resolvedTarget.targetFile}`);
   console.log(`🛂 SHA-256 Pasaport Mühürlendi (${passport.contentSha256.slice(0, 16)}...)`);
 
-  // Dependency Doctor
   const doctor = runSkillDoctor(resolvedTarget.targetDir);
   console.log(`🩺 Bağımlılık Durumu: ${doctor.summary}\n`);
   return 0;
@@ -718,15 +780,33 @@ export function startInteractiveCli(): Promise<void> {
     {
       key: '6',
       label: '📦 Güvenli Beceri Kur (Install with S0/S1 Gate)',
-      description: 'Hedef platformu seçerek (Claude/Antigravity/Cursor) doğrulanmış beceri yükleyin.',
+      description: 'Hedef platformu seçerek (Claude/Antigravity/Cursor/Windsurf/Copilot/Codex) doğrulanmış beceri yükleyin.',
       action: async () => {
         const name = await askQuestion('\x1b[32mKurulacak beceri adı (örn: safe-git, mcp-builder): \x1b[0m');
-        const target = await askQuestion('\x1b[32mHedef platform [claude | antigravity | cursor] (Enter: varsayılan): \x1b[0m');
+        const target = await askQuestion('\x1b[32mHedef platform [claude | antigravity | cursor | windsurf | copilot | codex]: \x1b[0m');
         if (name) {
           const args = [name];
           if (target) args.push('--target', target);
           await cmdInstall(args);
         }
+      }
+    },
+    {
+      key: '7',
+      label: '🧭 Otonom İş Akışı Radarı (Discover Workflows)',
+      description: 'skills.sh, GitHub SKILL.md, GitHub repoları ve Hacker News üzerinden yeni iş akışları keşfedin.',
+      action: async () => {
+        const q = await askQuestion('\x1b[32mKonu veya alan (3d, pixel-vfx, audio-sfx, shader, gamedev, video): \x1b[0m');
+        if (q) await cmdDiscover([q]);
+      }
+    },
+    {
+      key: '8',
+      label: '🤗 Hugging Face Veri Seti Ara (Datasets Search)',
+      description: 'Hugging Face üzerindeki veri setlerini ve modelleri sorgulayın.',
+      action: async () => {
+        const q = await askQuestion('\x1b[32mAranacak veri seti konusu (örn: pixel art, low poly): \x1b[0m');
+        if (q) await cmdDataset([q]);
       }
     }
   ];
@@ -757,7 +837,12 @@ export async function cmdMatch(rest: string[]): Promise<number> {
   return 0;
 }
 
-export async function cmdAdvisories(): Promise<number> {
+export async function cmdAdvisories(rest: string[] = []): Promise<number> {
+  if (rest.includes('--json')) {
+    console.log(JSON.stringify({ count: KNOWN_ADVISORIES.length, advisories: KNOWN_ADVISORIES }, null, 2));
+    return 0;
+  }
+
   console.log(`\n[SECURITY] GUNCEL GUVENLIK BULTENI VE TEHDIT ISTIHBARATI (${KNOWN_ADVISORIES.length} Kayit):\n`);
   for (const adv of KNOWN_ADVISORIES) {
     const tag = adv.severity === 'CRITICAL' ? '[KRITIK]' : '[UYARI]';
@@ -768,18 +853,113 @@ export async function cmdAdvisories(): Promise<number> {
   return 0;
 }
 
+export async function cmdDataset(rest: string[]): Promise<number> {
+  const isJson = rest.includes('--json');
+  const query = rest.filter((a) => !a.startsWith('-')).join(' ').trim() || 'pixel art';
+  const results = await searchHuggingFace(query, { type: 'dataset', limit: 8 });
+
+  if (isJson) {
+    console.log(JSON.stringify({ query, count: results.length, results }, null, 2));
+    return 0;
+  }
+
+  console.log(`\n🤗 HUGGING FACE VERİ SETİ ARAMASI: "${query}"...\n`);
+  if (results.length === 0) {
+    console.log(`  Eşleşen veri seti bulunamadı.\n`);
+    return 0;
+  }
+
+  for (const r of results) {
+    console.log(`  📦 ${r.id} (${r.downloads.toLocaleString()} indirme, ${r.likes} beğeni)`);
+    if (r.description) console.log(`     ${truncate(r.description.replace(/\n/g, ' '), 120)}`);
+    console.log(`     └─ Link: ${r.url}\n`);
+  }
+  return 0;
+}
+
+export async function cmdDiscover(rest: string[]): Promise<number> {
+  let domain: string | undefined;
+  let limit = 12;
+  let isJson = false;
+  let installTop = false;
+  let targetEco: AgentEcosystem | 'auto' = 'auto';
+  const queryParts: string[] = [];
+
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (a === '--domain' || a === '-d') {
+      domain = rest[++i];
+    } else if (a === '--limit' || a === '-l') {
+      limit = Math.max(1, Number(rest[++i]) || 12);
+    } else if (a === '--target' || a === '-t') {
+      targetEco = rest[++i] as AgentEcosystem;
+    } else if (a === '--install-top') {
+      installTop = true;
+    } else if (a === '--json') {
+      isJson = true;
+    } else if (!a.startsWith('-')) {
+      queryParts.push(a);
+    }
+  }
+
+  const query = queryParts.join(' ').trim();
+  if (!query && !domain) {
+    console.error(`Kullanım: safe-skill discover "<konu>" | --domain <${Object.keys(WORKFLOW_DOMAINS).join('|')}> [--limit 12] [--install-top] [--json]`);
+    return 2;
+  }
+
+  const { queries, results } = await discoverWorkflows(query, { domain, limit });
+
+  if (isJson) {
+    console.log(JSON.stringify({ domain, queries, count: results.length, results }, null, 2));
+    return 0;
+  }
+
+  console.log(`\n🧭 OTONOM İŞ AKIŞI RADARI (Discover Workflows)`);
+  console.log(`🔎 Sorgular: ${queries.join(' · ')} (${results.length} sonuç)\n`);
+
+  if (results.length === 0) {
+    console.log(`  Eşleşen iş akışı bulunamadı. Farklı anahtar kelimeler deneyin.\n`);
+    return 0;
+  }
+
+  const kindLabel: Record<string, string> = {
+    SKILL_MD: 'HAZIR SKILL.md',
+    AGENT_TOOL: 'AJAN ARACI / MCP',
+    WORKFLOW_REPO: 'AÇIK KAYNAK İŞ AKIŞI',
+    SHOW_HN: 'SHOW HN / MAKALE'
+  };
+
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    console.log(`  ${i + 1}. [${kindLabel[r.kind] || r.kind}] ${r.title} (${r.popularityLabel} | Skor: ${r.score})`);
+    console.log(`     ${truncate(r.description.replace(/\s+/g, ' '), 120)}`);
+    console.log(`     🔗 ${r.url}`);
+    console.log(`     └─ Kur: ${r.installCmd}\n`);
+  }
+
+  if (installTop && results.length > 0) {
+    console.log(`⬇️ En yüksek skorlu iş akışı kuruluyor: ${results[0].id}\n`);
+    return cmdInstall([results[0].id, '--target', targetEco]);
+  }
+
+  return 0;
+}
+
 const USAGE = `SAFE-SKILL: The Security-First Multi-Agent Skill Manager
-For Claude Code, Cursor, Windsurf & Google Antigravity
+For Claude Code, Cursor, Windsurf, Copilot, Codex & Google Antigravity
 
 Kullanım:
   safe-skill                                Etkilesimli TUI menusu (veya analiz)
   safe-skill <projeDizini>                  Belirtilen projeyi analiz et ve beceri oner
+  safe-skill discover "<konu>" [secenek]    skills.sh, GitHub ve HN'den yeni is akislari kesfet
   safe-skill search <sorgu>                 Anthropic resmi & topluluk becerilerini ara
+  safe-skill dataset <sorgu>                Hugging Face veri setlerini ara (hf)
   safe-skill match <istek/prompt>           Dogal dil ile semantik beceri onerisi
   safe-skill scan [dizin|beceri]            S0/S1 Guvenlik & Prompt Injection taramasi
   safe-skill check [secenekler]             Kurulu becerilerin guncellik durumunu denetle
   safe-skill update <isim> [secenekler]     Beceriyi guvenlik kapisiyla guncelle
-  safe-skill install <isim> [secenekler]    Beceriyi dogrulanmis guvenlik kapisiyla yukle
+  safe-skill install <hedef> [secenekler]   Anthropic, owner/repo@skill, GitHub/X URL kur
   safe-skill advisories                     Guncel guvenlik tehdit bultenini listele
   safe-skill mcp | --mcp                    STDIO Model Context Protocol sunucusunu baslat
   safe-skill doctor [beceri]                Calisma zamani arac ve bagimliliklarini denetle
@@ -788,10 +968,13 @@ Kullanım:
   safe-skill --help | -h                    Bu yardim mesajini goster
 
 Seçenekler:
-  --target, -t <claude|antigravity|cursor>  Hedef ajan ekosistemi (varsayılan: otomatik tespit)
+  --domain, -d <3d|pixel-vfx|audio-sfx|shader|gamedev|video>  Hazır alan taraması
+  --target, -t <claude|antigravity|cursor|windsurf|copilot|codex>
   --global                                  Kullanıcı ana dizinine global kur
   --workspace                               Mevcut çalışma alanına kur
+  --dry-run                                 Kurmadan önce içeriği ve S0/S1 taramasını önizle
   --force, -f                               Mevcut kurulumun üzerine yaz / uyarıları zorla
+  --json                                    Makine tarafından okunabilir JSON çıktısı
   --path <dizin>                            Özel hedef dizini belirt
 `;
 
@@ -818,8 +1001,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   }
 
   if (arg === 'search') return cmdSearch(rest);
+  if (arg === 'discover' || arg === 'scout' || arg === 'radar') return cmdDiscover(rest);
+  if (arg === 'dataset' || arg === 'hf') return cmdDataset(rest);
   if (arg === 'match' || arg === 'suggest') return cmdMatch(rest);
-  if (arg === 'advisories' || arg === 'advisory') return cmdAdvisories();
+  if (arg === 'advisories' || arg === 'advisory') return cmdAdvisories(rest);
   if (arg === 'mcp' || arg === '--mcp') {
     startMcpServer();
     return 0;
